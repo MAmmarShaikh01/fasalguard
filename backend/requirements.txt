@@ -1,0 +1,13 @@
+fastapi[standard]
+python-dotenv
+python-multipart
+pydantic
+transformers
+Pillow
+numpy
+scipy
+langchain
+langchain-groq
+langchain-community
+chromadb
+fastembed
