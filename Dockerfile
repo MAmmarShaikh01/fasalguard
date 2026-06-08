@@ -1,13 +1,17 @@
 FROM python:3.12-slim
 
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:$PATH"
+
 WORKDIR /app
 
-COPY backend/requirements.txt .
+COPY --chown=user backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu \
     && pip install scipy
 
-COPY backend/ .
+COPY --chown=user backend/ .
 
 EXPOSE 7860
 
