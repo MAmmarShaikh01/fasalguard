@@ -3,6 +3,7 @@ from models.vit_classifier import ViTClassifier
 from models.severity_analyzer import SeverityAnalyzer
 from utils.image_utils import preprocess_image
 from knowledge_base.plant_diseases import KNOWLEDGE_BASE
+from knowledge_base.plant_care import get_plant_name, get_watering_info
 import logging
 
 router = APIRouter()
@@ -45,12 +46,16 @@ async def predict_leaf(file: UploadFile = File(...)):
         confidence = top_k[0]["score"]
         severity_pct = severity.analyze(image, disease_name)
         treatment = lookup_treatment(disease_name)
+        plant_name = get_plant_name(disease_name)
+        watering = get_watering_info(disease_name)
     except Exception as e:
         logger.error(f"Inference failed: {e}")
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
     return {
         "disease": disease_name,
+        "plant_name": plant_name,
+        "watering": watering,
         "confidence": round(confidence, 3),
         "severity_percentage": round(severity_pct, 1),
         "treatment": treatment,
