@@ -37,7 +37,7 @@ def _get_chain():
             chunk = f"Disease: {entry['title']}\nCrop: {entry['crop']}\nSymptoms: {entry['symptoms']}\nOrganic Treatment: {entry['treatment_organic']}\nChemical Treatment: {entry['treatment_chemical']}\nPrevention: {entry['prevention']}"
             texts.append(chunk)
 
-        embedding = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+        embedding = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5", cache_dir="/tmp/fastembed")
         vectorstore = Chroma.from_texts(texts, embedding)
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
@@ -69,7 +69,6 @@ Rules:
         _chain = create_retrieval_chain(retriever, chain)
     except Exception as e:
         _chain = None
-        raise e
 
     return _chain
 
@@ -79,12 +78,18 @@ async def chat_with_bot(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    chain = _get_chain()
+    try:
+        chain = _get_chain()
+    except Exception:
+        chain = None
 
     if chain is None:
-        return ChatResponse(
-            reply="The treatment assistant is not configured yet. Please set the GROQ_API_KEY environment variable on Railway. You can get a free key at https://console.groq.com"
-        )
+        status = "no_key" if not os.environ.get("GROQ_API_KEY") else "setup_error"
+        if status == "no_key":
+            msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
+        else:
+            msg = "The treatment assistant is having trouble starting. This may be a temporary issue - please try again."
+        return ChatResponse(reply=msg)
 
     diagnosis_text = "No recent diagnosis"
     if req.last_diagnosis:
@@ -94,9 +99,11 @@ async def chat_with_bot(req: ChatRequest):
         sev = d.get("severity_percentage", 0)
         diagnosis_text = f"{disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)"
 
-    result = await chain.ainvoke({
-        "input": req.message,
-        "diagnosis": diagnosis_text,
-    })
-
-    return ChatResponse(reply=result["answer"])
+    try:
+        result = await chain.ainvoke({
+            "input": req.message,
+            "diagnosis": diagnosis_text,
+        })
+        return ChatResponse(reply=result["answer"])
+    except Exception:
+        return ChatResponse(reply="I encountered an error processing your request. Please try again.")
