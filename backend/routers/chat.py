@@ -12,20 +12,20 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
 
-_llm = None
-_system_prompt = None
+_client = None
+_SYSTEM_PROMPT = None
 
-def _setup():
-    global _llm, _system_prompt
+def _init():
+    global _client, _SYSTEM_PROMPT
 
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        return None
+        return
 
     try:
-        from langchain_groq import ChatGroq
-        from knowledge_base.plant_diseases import KNOWLEDGE_BASE
+        from groq import Groq
 
+        from knowledge_base.plant_diseases import KNOWLEDGE_BASE
         knowledge_text = ""
         for entry in KNOWLEDGE_BASE:
             knowledge_text += (
@@ -37,14 +37,9 @@ def _setup():
                 f"Prevention: {entry['prevention']}\n\n"
             )
 
-        _llm = ChatGroq(
-            model="llama3-70b-8192",
-            temperature=0.3,
-            max_tokens=1024,
-            api_key=api_key,
-        )
+        _client = Groq(api_key=api_key)
 
-        _system_prompt = f"""You are FasalGuard, an expert plant disease treatment assistant.
+        _SYSTEM_PROMPT = f"""You are FasalGuard, an expert plant disease treatment assistant.
 Answer questions about plant diseases using the knowledge base below.
 Be specific, practical, and actionable.
 
@@ -57,9 +52,11 @@ Rules:
 - If you don't know something, say so honestly
 - Keep responses concise but thorough
 - Use plain text, not markdown formatting"""
-        return True
-    except Exception:
-        return None
+    except ImportError:
+        pass
+
+
+_init()
 
 
 @router.post("/api/chat", response_model=ChatResponse)
@@ -67,15 +64,12 @@ async def chat_with_bot(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    if _llm is None:
-        ok = _setup()
-        if not ok:
-            status = "no_key" if not os.environ.get("GROQ_API_KEY") else "setup_error"
-            if status == "no_key":
-                msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
-            else:
-                msg = "The treatment assistant is having trouble starting. This may be a temporary issue - please try again."
-            return ChatResponse(reply=msg)
+    if _client is None:
+        if not os.environ.get("GROQ_API_KEY"):
+            msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
+        else:
+            msg = "The treatment assistant failed to initialize. Check that 'groq' Python package is installed."
+        return ChatResponse(reply=msg)
 
     diagnosis_context = ""
     if req.last_diagnosis:
@@ -85,15 +79,21 @@ async def chat_with_bot(req: ChatRequest):
         sev = d.get("severity_percentage", 0)
         diagnosis_context = f"\nCurrent Diagnosis: {disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)"
 
-    history_text = ""
-    for msg in req.history[-4:]:
-        role = "User" if msg.get("role") == "user" else "Assistant"
-        history_text += f"{role}: {msg.get('text', '')}\n"
+    messages = [{"role": "system", "content": _SYSTEM_PROMPT + diagnosis_context}]
 
-    prompt = f"{_system_prompt}{diagnosis_context}\n\n{history_text}User: {req.message}\nAssistant:"
+    for msg in req.history[-6:]:
+        role = "user" if msg.get("role") == "user" else "assistant"
+        messages.append({"role": role, "content": msg.get("text", "")})
+
+    messages.append({"role": "user", "content": req.message})
 
     try:
-        result = _llm.invoke(prompt)
-        return ChatResponse(reply=result.content)
-    except Exception:
-        return ChatResponse(reply="I encountered an error processing your request. Please try again.")
+        completion = _client.chat.completions.create(
+            model="llama3-70b-8192",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1024,
+        )
+        return ChatResponse(reply=completion.choices[0].message.content)
+    except Exception as e:
+        return ChatResponse(reply=f"I encountered an error: {str(e)}")
