@@ -1,5 +1,14 @@
 KNOWLEDGE_BASE = [
     {
+        "diseases": ["healthy"],
+        "crop": "General",
+        "title": "Healthy Plant",
+        "symptoms": "No disease symptoms detected. Leaves appear normal with natural coloration and no visible lesions, spots, or deformities.",
+        "treatment_organic": "No treatment needed. Continue regular plant care including proper watering, sunlight, and fertilizer as needed.",
+        "treatment_chemical": "No chemical treatment needed.",
+        "prevention": "Maintain regular care routine. Monitor for pests. Ensure proper watering and nutrition. Prune as needed for airflow."
+    },
+    {
         "diseases": ["apple_scab", "apple scab", "scab"],
         "crop": "Apple",
         "title": "Apple Scab",

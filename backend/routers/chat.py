@@ -89,7 +89,7 @@ async def chat_with_bot(req: ChatRequest):
 
     try:
         completion = _client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.3-70b-versatile",
             messages=messages,
             temperature=0.3,
             max_tokens=1024,
