@@ -24,13 +24,13 @@ PLANT_LABELS = [
 ]
 
 class ViTClassifier:
-    def __init__(self, model_name: str = "google/vit-base-patch16-224"):
+    def __init__(self, model_name: str = "VaigandlaHemanth/leaf-disease-clip-vit"):
         self.model_name = model_name
         self._pipeline = None
 
     def _load(self):
         if self._pipeline is None:
-            logger.info(f"Loading ViT model: {self.model_name}")
+            logger.info(f"Loading plant disease model: {self.model_name}")
             self._pipeline = pipeline(
                 "image-classification",
                 model=self.model_name,
