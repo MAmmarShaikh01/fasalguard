@@ -15,12 +15,14 @@ class ChatResponse(BaseModel):
 _client = None
 _SYSTEM_PROMPT = None
 
-def _init():
+def _ensure_initialized():
     global _client, _SYSTEM_PROMPT
+    if _client is not None:
+        return True
 
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        return
+        return False
 
     try:
         from groq import Groq
@@ -52,11 +54,9 @@ Rules:
 - If you don't know something, say so honestly
 - Keep responses concise but thorough
 - Use plain text, not markdown formatting"""
+        return True
     except ImportError:
-        pass
-
-
-_init()
+        return False
 
 
 @router.post("/api/chat", response_model=ChatResponse)
@@ -64,7 +64,7 @@ async def chat_with_bot(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    if _client is None:
+    if not _ensure_initialized():
         if not os.environ.get("GROQ_API_KEY"):
             msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
         else:
