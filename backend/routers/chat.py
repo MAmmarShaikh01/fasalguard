@@ -12,12 +12,11 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
 
-_chain = None
+_llm = None
+_system_prompt = None
 
-def _get_chain():
-    global _chain
-    if _chain is not None:
-        return _chain
+def _setup():
+    global _llm, _system_prompt
 
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
@@ -25,52 +24,42 @@ def _get_chain():
 
     try:
         from langchain_groq import ChatGroq
-        from langchain.chains import create_retrieval_chain
-        from langchain.chains.combine_documents import create_stuff_documents_chain
-        from langchain.prompts import ChatPromptTemplate
-        from langchain_community.vectorstores import Chroma
-        from langchain_community.embeddings import FastEmbedEmbeddings
         from knowledge_base.plant_diseases import KNOWLEDGE_BASE
 
-        texts = []
+        knowledge_text = ""
         for entry in KNOWLEDGE_BASE:
-            chunk = f"Disease: {entry['title']}\nCrop: {entry['crop']}\nSymptoms: {entry['symptoms']}\nOrganic Treatment: {entry['treatment_organic']}\nChemical Treatment: {entry['treatment_chemical']}\nPrevention: {entry['prevention']}"
-            texts.append(chunk)
+            knowledge_text += (
+                f"Disease: {entry['title']}\n"
+                f"Crop: {entry['crop']}\n"
+                f"Symptoms: {entry['symptoms']}\n"
+                f"Organic Treatment: {entry['treatment_organic']}\n"
+                f"Chemical Treatment: {entry['treatment_chemical']}\n"
+                f"Prevention: {entry['prevention']}\n\n"
+            )
 
-        embedding = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5", cache_dir="/tmp/fastembed")
-        vectorstore = Chroma.from_texts(texts, embedding)
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-
-        llm = ChatGroq(
+        _llm = ChatGroq(
             model="llama3-70b-8192",
             temperature=0.3,
             max_tokens=1024,
             api_key=api_key,
         )
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are FasalGuard, an expert plant disease treatment assistant. Answer questions about plant diseases using ONLY the provided context. Be specific, practical, and actionable.
+        _system_prompt = f"""You are FasalGuard, an expert plant disease treatment assistant.
+Answer questions about plant diseases using the knowledge base below.
+Be specific, practical, and actionable.
 
-Context: {context}
-
-Current Diagnosis: {diagnosis}
+KNOWLEDGE BASE:
+{knowledge_text}
 
 Rules:
 - Recommend specific organic and chemical treatments when relevant
 - Include dosage/preparation instructions when possible
-- If the user asks about their current diagnosis, prioritize that disease
 - If you don't know something, say so honestly
 - Keep responses concise but thorough
-- Use plain text, not markdown formatting"""),
-            ("human", "{input}"),
-        ])
-
-        chain = create_stuff_documents_chain(llm, prompt)
-        _chain = create_retrieval_chain(retriever, chain)
-    except Exception as e:
-        _chain = None
-
-    return _chain
+- Use plain text, not markdown formatting"""
+        return True
+    except Exception:
+        return None
 
 
 @router.post("/api/chat", response_model=ChatResponse)
@@ -78,32 +67,33 @@ async def chat_with_bot(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    try:
-        chain = _get_chain()
-    except Exception:
-        chain = None
+    if _llm is None:
+        ok = _setup()
+        if not ok:
+            status = "no_key" if not os.environ.get("GROQ_API_KEY") else "setup_error"
+            if status == "no_key":
+                msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
+            else:
+                msg = "The treatment assistant is having trouble starting. This may be a temporary issue - please try again."
+            return ChatResponse(reply=msg)
 
-    if chain is None:
-        status = "no_key" if not os.environ.get("GROQ_API_KEY") else "setup_error"
-        if status == "no_key":
-            msg = "The treatment assistant needs a GROQ_API_KEY. Set it in Hugging Face Space Settings → Repository Secrets."
-        else:
-            msg = "The treatment assistant is having trouble starting. This may be a temporary issue - please try again."
-        return ChatResponse(reply=msg)
-
-    diagnosis_text = "No recent diagnosis"
+    diagnosis_context = ""
     if req.last_diagnosis:
         d = req.last_diagnosis
         disease = d.get("disease", "unknown").replace("_", " ").replace("___", " — ")
         conf = d.get("confidence", 0)
         sev = d.get("severity_percentage", 0)
-        diagnosis_text = f"{disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)"
+        diagnosis_context = f"\nCurrent Diagnosis: {disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)"
+
+    history_text = ""
+    for msg in req.history[-4:]:
+        role = "User" if msg.get("role") == "user" else "Assistant"
+        history_text += f"{role}: {msg.get('text', '')}\n"
+
+    prompt = f"{_system_prompt}{diagnosis_context}\n\n{history_text}User: {req.message}\nAssistant:"
 
     try:
-        result = await chain.ainvoke({
-            "input": req.message,
-            "diagnosis": diagnosis_text,
-        })
-        return ChatResponse(reply=result["answer"])
+        result = _llm.invoke(prompt)
+        return ChatResponse(reply=result.content)
     except Exception:
         return ChatResponse(reply="I encountered an error processing your request. Please try again.")
