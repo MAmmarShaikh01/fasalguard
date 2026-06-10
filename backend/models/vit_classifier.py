@@ -1,3 +1,7 @@
+import os
+
+os.environ["TQDM_DISABLE"] = "1"
+
 import logging
 import numpy as np
 from transformers import pipeline
