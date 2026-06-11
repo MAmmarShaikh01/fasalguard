@@ -7,6 +7,8 @@ router = APIRouter()
 
 BLUR_THRESHOLD = 80.0
 DARKNESS_THRESHOLD = 50.0
+SATURATION_THRESHOLD = 40
+GREEN_RATIO_THRESHOLD = 0.35
 
 @router.post("/api/quality")
 async def check_image_quality(file: UploadFile = File(...)):
@@ -34,12 +36,18 @@ async def check_image_quality(file: UploadFile = File(...)):
     brightness_score = min(mean_brightness / 200.0, 1.0)
 
     rgb = np.array(image, dtype=np.float32)
-    green_channel = rgb[:, :, 1]
-    red_channel = rgb[:, :, 0]
-    blue_channel = rgb[:, :, 2]
+    max_c = np.max(rgb, axis=2)
+    min_c = np.min(rgb, axis=2)
+    saturation = max_c - min_c
+    colored = saturation > SATURATION_THRESHOLD
 
-    green_ratio = float(np.mean(green_channel > red_channel) + np.mean(green_channel > blue_channel)) / 2.0
-    likely_leaf = green_ratio > 0.35
+    if not np.any(colored):
+        green_ratio = 0.0
+    else:
+        green_dominant = (rgb[:, :, 1] > rgb[:, :, 0]) & (rgb[:, :, 1] > rgb[:, :, 2])
+        green_ratio = float(np.mean(green_dominant[colored]))
+
+    likely_leaf = green_ratio > GREEN_RATIO_THRESHOLD
 
     return {
         "is_blurry": is_blurry,

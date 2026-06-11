@@ -9,13 +9,19 @@ logger = logging.getLogger(__name__)
 
 classifier = PlantClassifier()
 
+SATURATION_THRESHOLD = 40
 GREEN_RATIO_THRESHOLD = 0.35
 
 def _likely_contains_plant(image) -> tuple[bool, float]:
     rgb = np.array(image, dtype=np.float32)
-    green_ratio = float(
-        np.mean(rgb[:, :, 1] > rgb[:, :, 0]) + np.mean(rgb[:, :, 1] > rgb[:, :, 2])
-    ) / 2.0
+    max_c = np.max(rgb, axis=2)
+    min_c = np.min(rgb, axis=2)
+    saturation = max_c - min_c
+    colored = saturation > SATURATION_THRESHOLD
+    if not np.any(colored):
+        return False, 0.0
+    green_dominant = (rgb[:, :, 1] > rgb[:, :, 0]) & (rgb[:, :, 1] > rgb[:, :, 2])
+    green_ratio = float(np.mean(green_dominant[colored]))
     return green_ratio > GREEN_RATIO_THRESHOLD, green_ratio
 
 @router.post("/api/identify-plant")
