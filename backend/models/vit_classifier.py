@@ -55,25 +55,28 @@ class ViTClassifier:
 
     def _preprocess(self, image: Image.Image) -> np.ndarray:
         image = image.resize((384, 384))
-        arr = np.array(image, dtype=np.float32)
+        arr = np.array(image, dtype=np.float32) / 255.0
         arr = np.expand_dims(arr, axis=0)
         return arr
 
-    def predict(self, image: Image.Image) -> tuple[str, float]:
+    def _get_probs(self, image: Image.Image) -> np.ndarray:
         self._load()
         input_arr = self._preprocess(image)
         self._interpreter.set_tensor(self._input_details[0]["index"], input_arr)
         self._interpreter.invoke()
-        probs = self._interpreter.get_tensor(self._output_details[0]["index"])[0]
+        raw = self._interpreter.get_tensor(self._output_details[0]["index"])[0]
+        if raw.sum() > 0 and abs(raw.sum() - 1.0) > 0.01:
+            exp = np.exp(raw - np.max(raw))
+            return exp / exp.sum()
+        return raw
+
+    def predict(self, image: Image.Image) -> tuple[str, float]:
+        probs = self._get_probs(image)
         top_idx = int(np.argmax(probs))
         return self._labels[top_idx], float(probs[top_idx])
 
     def predict_top_k(self, image: Image.Image, k: int = 3) -> list[dict]:
-        self._load()
-        input_arr = self._preprocess(image)
-        self._interpreter.set_tensor(self._input_details[0]["index"], input_arr)
-        self._interpreter.invoke()
-        probs = self._interpreter.get_tensor(self._output_details[0]["index"])[0]
+        probs = self._get_probs(image)
         top_indices = np.argsort(probs)[-k:][::-1]
         return [
             {"label": self._labels[int(i)], "score": float(probs[i])}
