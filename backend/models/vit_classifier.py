@@ -38,12 +38,16 @@ class ViTClassifier:
             self._labels = {int(k): v for k, v in json.load(f).items()}
 
         try:
-            import tflite_runtime.interpreter as tflite
+            from ai_edge_litert.interpreter import Interpreter
         except ImportError:
-            import tensorflow as tf
-            tflite = tf.lite
+            try:
+                import tflite_runtime.interpreter as tflite
+                Interpreter = tflite.Interpreter
+            except ImportError:
+                import tensorflow as tf
+                Interpreter = tf.lite.Interpreter
 
-        self._interpreter = tflite.Interpreter(model_path=model_path)
+        self._interpreter = Interpreter(model_path=model_path)
         self._interpreter.allocate_tensors()
         self._input_details = self._interpreter.get_input_details()
         self._output_details = self._interpreter.get_output_details()
