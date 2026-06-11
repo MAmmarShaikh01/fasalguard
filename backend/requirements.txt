@@ -7,3 +7,5 @@ Pillow
 numpy
 scipy
 groq
+huggingface-hub
+tflite-runtime

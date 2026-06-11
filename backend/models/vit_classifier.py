@@ -1,54 +1,77 @@
 import os
-
 os.environ["TQDM_DISABLE"] = "1"
 
+import json
 import logging
 import numpy as np
-from transformers import pipeline
 from PIL import Image
+from huggingface_hub import hf_hub_download
 
 logger = logging.getLogger(__name__)
 
-PLANT_LABELS = [
-    "Apple___Apple_scab", "Apple___Black_rot", "Apple___Cedar_apple_rust", "Apple___healthy",
-    "Blueberry___healthy", "Cherry_(including_sour)___Powdery_mildew", "Cherry_(including_sour)___healthy",
-    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot", "Corn_(maize)___Common_rust_",
-    "Corn_(maize)___Northern_Leaf_Blight", "Corn_(maize)___healthy",
-    "Grape___Black_rot", "Grape___Esca_(Black_Measles)", "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)",
-    "Grape___healthy", "Orange___Haunglongbing_(Citrus_greening)",
-    "Peach___Bacterial_spot", "Peach___healthy",
-    "Pepper,_bell___Bacterial_spot", "Pepper,_bell___healthy",
-    "Potato___Early_blight", "Potato___Late_blight", "Potato___healthy",
-    "Raspberry___healthy", "Soybean___healthy",
-    "Squash___Powdery_mildew", "Strawberry___Leaf_scorch", "Strawberry___healthy",
-    "Tomato___Bacterial_spot", "Tomato___Early_blight", "Tomato___Late_blight",
-    "Tomato___Leaf_Mold", "Tomato___Septoria_leaf_spot",
-    "Tomato___Spider_mites Two-spotted_spider_mite", "Tomato___Target_Spot",
-    "Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato___Tomato_mosaic_virus", "Tomato___healthy",
-]
+MODEL_REPO = "animeshakr/plant-disease-efficientnetv2s"
+TFLITE_FILE = "model_float16_quant.tflite"
+LABELS_FILE = "class_indices.json"
+
 
 class ViTClassifier:
-    def __init__(self, model_name: str = "VaigandlaHemanth/leaf-disease-clip-vit"):
-        self.model_name = model_name
-        self._pipeline = None
+    def __init__(self, model_repo: str = MODEL_REPO):
+        self.model_repo = model_repo
+        self._interpreter = None
+        self._labels: dict[int, str] = {}
 
     def _load(self):
-        if self._pipeline is None:
-            logger.info(f"Loading plant disease model: {self.model_name}")
-            self._pipeline = pipeline(
-                "image-classification",
-                model=self.model_name,
-                top_k=3,
-            )
+        if self._interpreter is not None:
+            return
+
+        logger.info(f"Downloading model from {self.model_repo}")
+        model_path = hf_hub_download(
+            repo_id=self.model_repo,
+            filename=TFLITE_FILE,
+        )
+        labels_path = hf_hub_download(
+            repo_id=self.model_repo,
+            filename=LABELS_FILE,
+        )
+
+        with open(labels_path) as f:
+            self._labels = {int(k): v for k, v in json.load(f).items()}
+
+        try:
+            import tflite_runtime.interpreter as tflite
+        except ImportError:
+            import tensorflow as tf
+            tflite = tf.lite
+
+        self._interpreter = tflite.Interpreter(model_path=model_path)
+        self._interpreter.allocate_tensors()
+        self._input_details = self._interpreter.get_input_details()
+        self._output_details = self._interpreter.get_output_details()
+        logger.info(f"Model loaded, input shape: {self._input_details[0]['shape']}")
+
+    def _preprocess(self, image: Image.Image) -> np.ndarray:
+        image = image.resize((384, 384))
+        arr = np.array(image, dtype=np.float32)
+        arr = np.expand_dims(arr, axis=0)
+        return arr
 
     def predict(self, image: Image.Image) -> tuple[str, float]:
         self._load()
-        results = self._pipeline(image)
-        top = results[0]
-        label = top["label"]
-        confidence = top["score"]
-        return label, confidence
+        input_arr = self._preprocess(image)
+        self._interpreter.set_tensor(self._input_details[0]["index"], input_arr)
+        self._interpreter.invoke()
+        probs = self._interpreter.get_tensor(self._output_details[0]["index"])[0]
+        top_idx = int(np.argmax(probs))
+        return self._labels[top_idx], float(probs[top_idx])
 
-    def predict_top_k(self, image: Image.Image) -> list[dict]:
+    def predict_top_k(self, image: Image.Image, k: int = 3) -> list[dict]:
         self._load()
-        return self._pipeline(image)
+        input_arr = self._preprocess(image)
+        self._interpreter.set_tensor(self._input_details[0]["index"], input_arr)
+        self._interpreter.invoke()
+        probs = self._interpreter.get_tensor(self._output_details[0]["index"])[0]
+        top_indices = np.argsort(probs)[-k:][::-1]
+        return [
+            {"label": self._labels[int(i)], "score": float(probs[i])}
+            for i in top_indices
+        ]
