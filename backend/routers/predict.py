@@ -88,7 +88,13 @@ async def predict_leaf(file: UploadFile = File(...)):
         plant_1 = top_k[1]["label"].split("___")[0].lower().strip("_() ")
         margin = top_k[0]["score"] - top_k[1]["score"]
         if plant_0 != plant_1 and (margin < 0.15 or confidence < 0.5):
-            warnings.append(f"Conflicting plant detections: '{top_k[0]['label']}' vs '{top_k[1]['label']}'")
+            plant_scores: dict[str, float] = {}
+            for r in top_k:
+                p = r["label"].split("___")[0].replace("_", " ").replace("(", "").replace(")", "").strip()
+                if p not in plant_scores or r["score"] > plant_scores[p]:
+                    plant_scores[p] = r["score"]
+            details = ", ".join(f"{p.lower()} ({s*100:.1f}%)" for p, s in plant_scores.items())
+            warnings.append(f"Conflicting predictions — different plants detected ({details}). Try a clearer leaf photo.")
 
     response = {
         "disease": disease_name,
