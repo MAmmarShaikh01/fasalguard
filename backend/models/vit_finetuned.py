@@ -43,7 +43,6 @@ class ViTFineTuned:
             self._processor = AutoImageProcessor.from_pretrained(self.model_dir)
             self._model = AutoModelForImageClassification.from_pretrained(
                 self.model_dir,
-                torchscript=False,
             )
             self._model.eval()
 
