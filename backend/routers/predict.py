@@ -87,7 +87,7 @@ async def predict_leaf(file: UploadFile = File(...)):
         plant_0 = top_k[0]["label"].split("___")[0].lower().strip("_() ")
         plant_1 = top_k[1]["label"].split("___")[0].lower().strip("_() ")
         margin = top_k[0]["score"] - top_k[1]["score"]
-        if plant_0 != plant_1 and (margin < 0.15 or confidence < 0.5):
+        if plant_0 != plant_1 and margin < 0.15:
             plant_scores: dict[str, float] = {}
             for r in top_k:
                 p = r["label"].split("___")[0].replace("_", " ").replace("(", "").replace(")", "").strip()
