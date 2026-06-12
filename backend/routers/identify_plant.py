@@ -12,6 +12,7 @@ classifier = PlantClassifier()
 SATURATION_THRESHOLD = 40
 GREEN_RATIO_THRESHOLD = 0.35
 
+
 def _likely_contains_plant(image) -> tuple[bool, float]:
     rgb = np.array(image, dtype=np.float32)
     max_c = np.max(rgb, axis=2)
@@ -23,6 +24,7 @@ def _likely_contains_plant(image) -> tuple[bool, float]:
     green_dominant = (rgb[:, :, 1] > rgb[:, :, 0]) & (rgb[:, :, 1] > rgb[:, :, 2])
     green_ratio = float(np.mean(green_dominant[colored]))
     return green_ratio > GREEN_RATIO_THRESHOLD, green_ratio
+
 
 @router.post("/api/identify-plant")
 async def identify_plant(file: UploadFile = File(...)):

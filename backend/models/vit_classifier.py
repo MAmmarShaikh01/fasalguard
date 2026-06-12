@@ -82,3 +82,17 @@ class ViTClassifier:
             {"label": self._labels[int(i)], "score": float(probs[i])}
             for i in top_indices
         ]
+
+    def predict_plant_only(self, image: Image.Image) -> list[dict]:
+        """Aggregate predictions by plant name (extracted from PlantVillage labels)."""
+        probs = self._get_probs(image)
+        plant_scores: dict[str, float] = {}
+        for idx, prob in enumerate(probs):
+            label = self._labels.get(idx, f"class_{idx}")
+            plant = label.split("___")[0].replace("_", " ").replace("(", "").replace(")", "").strip()
+            plant_scores[plant] = plant_scores.get(plant, 0) + float(prob)
+        sorted_plants = sorted(plant_scores.items(), key=lambda x: -x[1])
+        return [
+            {"label": plant, "score": round(score, 4)}
+            for plant, score in sorted_plants[:5]
+        ]

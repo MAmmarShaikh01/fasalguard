@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && pip install scipy
 
 COPY --chown=user backend/ .
+COPY --chown=user fasalguard_final_93pct/ fasalguard_final_93pct/
 
 EXPOSE 7860
 

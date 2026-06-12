@@ -3,6 +3,7 @@ python-dotenv
 python-multipart
 pydantic
 transformers
+accelerate
 Pillow
 numpy
 scipy
