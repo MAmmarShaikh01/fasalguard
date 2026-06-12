@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []
     last_diagnosis: dict | None = None
+    diagnosis_history: list[dict] = []
 
 class ChatResponse(BaseModel):
     reply: str
@@ -41,19 +42,26 @@ def _ensure_initialized():
 
         _client = Groq(api_key=api_key)
 
-        _SYSTEM_PROMPT = f"""You are FasalGuard, an expert plant disease treatment assistant.
-Answer questions about plant diseases using the knowledge base below.
-Be specific, practical, and actionable.
+        _SYSTEM_PROMPT = f"""You are FasalGuard, an AI plant disease diagnosis and treatment assistant. You ONLY answer questions about:
 
-KNOWLEDGE BASE:
-{knowledge_text}
+1. Plant disease identification, symptoms, and causes
+2. Treatment recommendations (organic and chemical)
+3. Prevention methods for plant diseases
+4. Plant care (watering, sunlight, fertilizer)
+5. Questions about the user's past scan results (history of diagnosed plants)
+6. General agricultural and gardening advice related to plant health
 
-Rules:
+STRICT RULES:
+- If a question is NOT about plants, agriculture, gardening, or plant diseases, politely refuse: "I'm sorry, I can only answer questions about plants and plant diseases. Please ask me something about plant health or your scan results."
+- Use the knowledge base below as your primary source. If information is not in the knowledge base, say so honestly.
 - Recommend specific organic and chemical treatments when relevant
 - Include dosage/preparation instructions when possible
-- If you don't know something, say so honestly
 - Keep responses concise but thorough
-- Use plain text, not markdown formatting"""
+- Use plain text, not markdown formatting
+- When the user asks about their scan history, reference the provided diagnosis history to answer
+
+KNOWLEDGE BASE:
+{knowledge_text}"""
         return True
     except ImportError:
         return False
@@ -71,15 +79,30 @@ async def chat_with_bot(req: ChatRequest):
             msg = "The treatment assistant failed to initialize. Check that 'groq' Python package is installed."
         return ChatResponse(reply=msg)
 
-    diagnosis_context = ""
+    context_parts = []
+
     if req.last_diagnosis:
         d = req.last_diagnosis
         disease = d.get("disease", "unknown").replace("_", " ").replace("___", " — ")
         conf = d.get("confidence", 0)
         sev = d.get("severity_percentage", 0)
-        diagnosis_context = f"\nCurrent Diagnosis: {disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)"
+        context_parts.append(f"Current Diagnosis: {disease} (confidence: {conf:.1%}, severity: {sev:.1f}%)")
 
-    messages = [{"role": "system", "content": _SYSTEM_PROMPT + diagnosis_context}]
+    if req.diagnosis_history:
+        lines = ["\nPast Scan History:"]
+        for i, diag in enumerate(req.diagnosis_history[-10:], 1):
+            d_name = diag.get("disease", "unknown").replace("_", " ").replace("___", " — ")
+            d_conf = diag.get("confidence", 0)
+            d_sev = diag.get("severity_percentage", 0)
+            d_time = diag.get("timestamp", 0)
+            lines.append(f"  {i}. {d_name} (confidence: {d_conf:.1%}, severity: {d_sev:.1f}%)")
+        context_parts.append("\n".join(lines))
+
+    system_content = _SYSTEM_PROMPT
+    if context_parts:
+        system_content += "\n\n" + "\n".join(context_parts)
+
+    messages = [{"role": "system", "content": system_content}]
 
     for msg in req.history[-6:]:
         role = "user" if msg.get("role") == "user" else "assistant"
