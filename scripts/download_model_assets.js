@@ -1,17 +1,20 @@
 /**
- * Downloads the PlantVillage TFLite model and labels for offline inference.
- * Run: node scripts/download_model_assets.js
- * 
- * This script:
- * 1. Downloads the TFLite model from HuggingFace
- * 2. Saves it to app/assets/plant_model/
- * 3. Saves the class labels JSON
+ * Downloads the fine-tuned ViT TFLite model and labels for offline inference.
+ * Run this AFTER converting the model to TFLite via convert_vit_to_tflite_colab.py
+ *
+ * Usage:
+ *   1. Run convert_vit_to_tflite_colab.py on Colab
+ *   2. Upload model_float16.tflite + class_indices.json to a HuggingFace repo
+ *   3. Update MODEL_REPO and FILES below
+ *   4. Run: node scripts/download_model_assets.js
  */
 
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
+// TODO: Update MODEL_REPO after uploading TFLite files to HuggingFace
+// Currently downloads the old EfficientNetV2S model as fallback
 const MODEL_REPO = "animeshakr/plant-disease-efficientnetv2s";
 const FILES = [
   { name: "model_float16_quant.tflite", output: "model.tflite" },

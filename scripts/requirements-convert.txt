@@ -1,0 +1,6 @@
+torch
+transformers
+onnx>=1.14
+onnx2tf
+tensorflow
+protobuf<=3.20.3
