@@ -70,14 +70,15 @@ async def predict_leaf(file: UploadFile = File(...)):
     warnings: list[str] = []
     if confidence < 0.3:
         warnings.append(f"Low confidence ({confidence:.1%}) — results may be inaccurate")
-    if len(top_k) >= 2:
-        plant_0 = top_k[0]["label"].split("___")[0].lower().strip("_() ")
-        plant_1 = top_k[1]["label"].split("___")[0].lower().strip("_() ")
-        if plant_0 != plant_1:
-            warnings.append(f"Conflicting plant detections: '{top_k[0]['label']}' vs '{top_k[1]['label']}'")
     top_3_sum = sum(r["score"] for r in top_k[:3])
     if top_3_sum < 0.5:
         warnings.append("Model is uncertain about this image")
+    if len(top_k) >= 2:
+        plant_0 = top_k[0]["label"].split("___")[0].lower().strip("_() ")
+        plant_1 = top_k[1]["label"].split("___")[0].lower().strip("_() ")
+        margin = top_k[0]["score"] - top_k[1]["score"]
+        if plant_0 != plant_1 and (margin < 0.15 or confidence < 0.5):
+            warnings.append(f"Conflicting plant detections: '{top_k[0]['label']}' vs '{top_k[1]['label']}'")
 
     response = {
         "disease": disease_name,
