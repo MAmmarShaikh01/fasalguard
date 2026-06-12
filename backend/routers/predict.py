@@ -3,6 +3,7 @@ from models.vit_classifier import ViTClassifier
 from models.vit_finetuned import ViTFineTuned
 from models.severity_analyzer import SeverityAnalyzer
 from utils.image_utils import preprocess_image
+from utils.quality_check import analyze_image_quality
 from knowledge_base.plant_diseases import KNOWLEDGE_BASE
 from knowledge_base.plant_care import get_plant_name, get_watering_info
 import logging
@@ -55,6 +56,8 @@ async def predict_leaf(file: UploadFile = File(...)):
         logger.error(f"Image preprocessing failed: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid image: {str(e)}")
 
+    quality = analyze_image_quality(image)
+
     try:
         top_k = classifier.predict_top_k(image)
         disease_name = top_k[0]["label"]
@@ -68,6 +71,13 @@ async def predict_leaf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
 
     warnings: list[str] = []
+    if not quality["passed"]:
+        if not quality["likely_leaf"]:
+            warnings.append("Image doesn't appear to be a leaf")
+        if quality["is_blurry"]:
+            warnings.append("Image is blurry — results may be affected")
+        if quality["is_too_dark"]:
+            warnings.append("Image is too dark — results may be affected")
     if confidence < 0.3:
         warnings.append(f"Low confidence ({confidence:.1%}) — results may be inaccurate")
     top_3_sum = sum(r["score"] for r in top_k[:3])
