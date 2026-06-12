@@ -29,3 +29,10 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# App boilerplate assets (recreated by Expo)
+app/assets/
+app/LICENSE
+app/.claude/
+app/AGENTS.md
+app/CLAUDE.md

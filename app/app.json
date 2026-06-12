@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "FasalGuard",
+    "slug": "fasalguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FasalGuard needs camera access to scan your plant leaves."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FasalGuard needs photo library access to select leaf images."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "FasalGuard needs camera access to scan your plant leaves.",
+        "NSPhotoLibraryUsageDescription": "FasalGuard needs photo library access to select leaf images."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

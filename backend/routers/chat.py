@@ -90,7 +90,7 @@ async def chat_with_bot(req: ChatRequest):
 
     if req.diagnosis_history:
         lines = ["\nPast Scan History:"]
-        for i, diag in enumerate(req.diagnosis_history[-10:], 1):
+        for i, diag in enumerate(req.diagnosis_history[-20:], 1):
             d_name = diag.get("disease", "unknown").replace("_", " ").replace("___", " — ")
             d_conf = diag.get("confidence", 0)
             d_sev = diag.get("severity_percentage", 0)
