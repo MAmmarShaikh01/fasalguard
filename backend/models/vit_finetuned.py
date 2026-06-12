@@ -8,7 +8,13 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "fasalguard_final_93pct"
+# Resolve model directory — works both locally and inside Docker
+_HERE = Path(__file__).resolve().parent
+# Local:  backend/models/ -> ../.. -> project root
+_LOCAL = _HERE.parent.parent / "fasalguard_final_93pct"
+# Docker: /app/models/ -> /app
+_DOCKER = _HERE.parent / "fasalguard_final_93pct"
+MODEL_DIR = _DOCKER if _DOCKER.exists() else _LOCAL
 
 
 class ViTFineTuned:
