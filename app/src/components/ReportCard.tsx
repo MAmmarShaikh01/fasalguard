@@ -79,7 +79,7 @@ export function ReportCard({ result, imageUri }: Props) {
       {(result.confidence < 0.5 && (!result.top_predictions || result.top_predictions.length < 2 || result.confidence - result.top_predictions[1].score <= 0.08)) && (
         <View style={styles.warningBanner}>
           <AlertTriangle size={16} stroke={colors.warningText} />
-          <Text style={styles.warningText}>Low confidence — the image may not contain a clear leaf. Consider retaking.</Text>
+          <Text style={styles.warningText}>We couldn't get a confident read on this — try a clearer photo of the leaf</Text>
         </View>
       )}
 

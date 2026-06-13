@@ -87,16 +87,16 @@ async def predict_leaf(file: UploadFile = File(...)):
     warnings: list[str] = []
     if not quality["passed"]:
         if not quality["likely_leaf"]:
-            warnings.append("Image doesn't appear to be a leaf")
+            warnings.append("This doesn't look like a leaf photo — try uploading a clear picture of a leaf")
         if quality["is_blurry"]:
-            warnings.append("Image is blurry — results may be affected")
+            warnings.append("The photo is a bit blurry — results might not be accurate")
         if quality["is_too_dark"]:
-            warnings.append("Image is too dark — results may be affected")
+            warnings.append("The photo is too dark — results might not be accurate")
     if confidence < 0.3:
-        warnings.append(f"Low confidence ({confidence:.1%}) — results may be inaccurate")
+        warnings.append(f"We're not very sure about this one ({confidence:.1%} certainty) — try a clearer leaf photo")
     top_3_sum = sum(r["score"] for r in top_k[:3])
     if top_3_sum < 0.5:
-        warnings.append("Model is uncertain about this image")
+        warnings.append("Hmm, we couldn't get a clear read on this image. Try a different angle or better lighting")
     if len(top_k) >= 2:
         plant_0 = top_k[0]["label"].split("___")[0].lower().strip("_() ")
         plant_1 = top_k[1]["label"].split("___")[0].lower().strip("_() ")
@@ -108,7 +108,7 @@ async def predict_leaf(file: UploadFile = File(...)):
                 if p not in plant_scores or r["score"] > plant_scores[p]:
                     plant_scores[p] = r["score"]
             details = ", ".join(f"{p.lower()} ({s*100:.1f}%)" for p, s in plant_scores.items())
-            warnings.append(f"Conflicting predictions — different plants detected ({details}). Try a clearer leaf photo.")
+            warnings.append(f"We're seeing signs of multiple plants ({details}) — try zooming in on a single leaf")
 
     response = {
         "disease": disease_name,
