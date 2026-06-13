@@ -51,4 +51,4 @@ export interface PlantIdentification {
   imageUri?: string;
 }
 
-export type Screen = "camera" | "result" | "history" | "chat";
+export type Screen = "loading" | "camera" | "result" | "history" | "chat" | "about";

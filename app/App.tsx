@@ -6,6 +6,8 @@ import { CameraScreen } from "./src/screens/CameraScreen";
 import { ResultScreen } from "./src/screens/ResultScreen";
 import { ChatScreen } from "./src/screens/ChatScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
+import { LoadingScreen } from "./src/screens/LoadingScreen";
+import { AboutScreen } from "./src/screens/AboutScreen";
 import { useDiagnosticStore } from "./src/store/useDiagnosticStore";
 import type { Screen } from "./src/types";
 import { colors, shadows, borderRadius } from "./src/theme";
@@ -19,16 +21,18 @@ const tabs: { key: Screen; label: string; icon: typeof Scan }[] = [
 export default function App() {
   const screen = useDiagnosticStore((s) => s.currentScreen);
   const setScreen = useDiagnosticStore((s) => s.setScreen);
-  const showTabs = screen !== "result";
+  const showTabs = screen !== "result" && screen !== "loading" && screen !== "about";
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <StatusBar style="dark" />
       <View style={styles.content}>
+        {screen === "loading" && <LoadingScreen />}
         {screen === "camera" && <CameraScreen />}
         {screen === "result" && <ResultScreen />}
         {screen === "history" && <HistoryScreen />}
         {screen === "chat" && <ChatScreen />}
+        {screen === "about" && <AboutScreen />}
       </View>
       {showTabs && (
         <View style={styles.tabBar}>

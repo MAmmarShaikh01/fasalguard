@@ -39,3 +39,6 @@ app/CLAUDE.md
 
 # PlantDoc training outputs (best.pt is copied to backend/models/)
 plantdoc_complete/
+
+app-icon.jpg
+new-icon.png

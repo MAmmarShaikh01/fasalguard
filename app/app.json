@@ -28,6 +28,7 @@
       }
     },
     "android": {
+      "package": "com.fasalguard.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -42,6 +43,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "90af7d22-cb43-40b3-9910-4665ab032578"
+      }
+    },
+    "owner": "ammarshaikh0101s-organization"
   }
 }

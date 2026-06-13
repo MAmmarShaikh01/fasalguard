@@ -30,7 +30,7 @@ interface DiagnosticState {
 export const useDiagnosticStore = create<DiagnosticState>()(
   persist(
     (set) => ({
-      currentScreen: "camera",
+      currentScreen: "loading",
       currentResult: null,
       capturedImageUri: null,
       isProcessing: false,

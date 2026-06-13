@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Platform, ScrollView } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Platform, ScrollView, Modal, Linking } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import Animated, { FadeIn, FadeInUp, FadeInDown, useAnimatedStyle, withSpring, useSharedValue } from "react-native-reanimated";
-import { ImagePlus, Leaf, Upload, ScanLine } from "lucide-react-native";
+import { ImagePlus, Leaf, Upload, ScanLine, Info, Camera, Clock } from "lucide-react-native";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
 import { predictLeaf, predictLeafFromFile, checkQualityFromFile } from "../services/api";
 import { compressImage } from "../utils/compress";
@@ -13,14 +14,10 @@ import type { DiagnosticResult } from "../types";
 
 const isWeb = Platform.OS === "web";
 
-type Stage = "viewfinder" | "review";
+type Stage = "home" | "camera" | "review";
 
 function extractPlantName(label: string): string {
   return label.split("___")[0].replace(/_/g, " ").replace(/\(/g, "").replace(/\)/g, "").trim().toLowerCase();
-}
-
-function getPlantFromPrediction(p: { label: string }): string {
-  return extractPlantName(p.label);
 }
 
 function validatePredictions(
@@ -28,10 +25,6 @@ function validatePredictions(
   topK: number = 3
 ): string | null {
   if (result.confidence >= 0.55) return null;
-
-  const topP = result.top_predictions ?? [];
-  const topN = topP.slice(0, topK);
-
   return null;
 }
 
@@ -46,17 +39,54 @@ export function CameraScreen() {
   const isProcessing = useDiagnosticStore((s) => s.isProcessing);
   const error = useDiagnosticStore((s) => s.error);
 
+  const goToAbout = useCallback(() => setScreen("about"), [setScreen]);
+  const goToHistory = useCallback(() => setScreen("history"), [setScreen]);
+
   const leafScale = useSharedValue(1);
-  const leafRotate = useSharedValue(0);
   const [isLeafHovered, setIsLeafHovered] = useState(false);
 
   const leafAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: leafScale.value }, { rotate: `${leafRotate.value}deg` }],
+    transform: [{ scale: leafScale.value }],
   }));
 
-  const [stage, setStage] = useState<Stage>("viewfinder");
+  const [permission, requestPermission] = useCameraPermissions();
+  const [stage, setStage] = useState<Stage>("home");
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [quality, setQuality] = useState({ isBlurry: false, isTooDark: false, likelyLeaf: true, passed: true });
+  const [cameraReady, setCameraReady] = useState(false);
+  const [showPermDialog, setShowPermDialog] = useState(false);
+
+  async function openCamera() {
+    if (!permission) return;
+    if (permission.granted) {
+      setCameraReady(false);
+      setStage("camera");
+    } else if (permission.canAskAgain) {
+      setShowPermDialog(true);
+    } else {
+      setError("Camera permission is permanently denied. Please enable it in your device settings.");
+    }
+  }
+
+  async function handlePermAllow() {
+    setShowPermDialog(false);
+    const result = await requestPermission();
+    if (result.granted) {
+      setCameraReady(false);
+      setStage("camera");
+    } else {
+      setError("Camera access was denied. You can enable it later in your device settings.");
+    }
+  }
+
+  function handlePermDeny() {
+    setShowPermDialog(false);
+    setError("Camera access was denied. You can enable it later in your device settings.");
+  }
+
+  function openSettings() {
+    Linking.openSettings();
+  }
 
   async function processAndPredict(uri: string, force = false) {
     try {
@@ -102,9 +132,9 @@ export function CameraScreen() {
   }
 
   async function takePicture() {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !cameraReady) return;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-    if (photo?.uri) { setPreviewUri(photo.uri); await processAndPredict(photo.uri); }
+    if (photo?.uri) { setPreviewUri(photo.uri); setStage("review"); await processAndPredict(photo.uri); }
   }
 
   async function pickFromGallery() {
@@ -174,7 +204,7 @@ export function CameraScreen() {
   }
 
   const handleRetake = useCallback(() => {
-    setStage("viewfinder"); setPreviewUri(null);
+    setStage("home"); setPreviewUri(null);
     setQuality({ isBlurry: false, isTooDark: false, likelyLeaf: true, passed: true }); setError(null);
   }, []);
 
@@ -182,17 +212,24 @@ export function CameraScreen() {
     if (!previewUri) return; await processAndPredict(previewUri, true);
   }, [previewUri]);
 
+  const handleBackToHome = useCallback(() => {
+    setStage("home"); setPreviewUri(null); setError(null);
+  }, []);
+
   if (isWeb) {
     return (
       <View style={styles.container}>
-        {stage === "viewfinder" && (
+        <TouchableOpacity onPress={goToAbout} style={styles.aboutButton} activeOpacity={0.7}>
+          <Info size={18} stroke={colors.textTertiary} />
+        </TouchableOpacity>
+        {stage === "home" && (
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} bounces={false}>
             <Animated.View entering={FadeInUp.duration(600).springify()}>
               <View style={styles.heroSection}>
                 <Animated.View
                   style={[styles.decorRing, isLeafHovered && styles.decorRingHovered, leafAnimatedStyle]}
-                  onMouseEnter={() => { setIsLeafHovered(true); leafScale.value = withSpring(1.08, { damping: 8, stiffness: 100 }); leafRotate.value = withSpring(-5, { damping: 6, stiffness: 80 }); }}
-                  onMouseLeave={() => { setIsLeafHovered(false); leafScale.value = withSpring(1, { damping: 10, stiffness: 120 }); leafRotate.value = withSpring(0, { damping: 8, stiffness: 100 }); }}
+                  onMouseEnter={() => { setIsLeafHovered(true); leafScale.value = withSpring(1.08, { damping: 8, stiffness: 100 }); }}
+                  onMouseLeave={() => { setIsLeafHovered(false); leafScale.value = withSpring(1, { damping: 10, stiffness: 120 }); }}
                 >
                   <View style={[styles.decorRingInner, isLeafHovered && styles.decorRingInnerHovered]}>
                     <View style={[styles.webIconWrap, isLeafHovered && styles.webIconWrapHovered]}>
@@ -282,25 +319,86 @@ export function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {stage === "viewfinder" && (
-        <View style={styles.camera}>
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.overlay}>
-            <Text style={styles.hint}>Take a photo of a leaf to identify the plant and detect diseases</Text>
-            <View style={styles.frame} />
-            {error && <Text style={styles.error}>{error}</Text>}
-            <View style={styles.controls}>
-              <TouchableOpacity onPress={pickFromGallery} style={styles.iconButton} activeOpacity={0.7}>
-                <ImagePlus size={24} stroke="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.captureButton, isProcessing && { opacity: 0.5 }]}
-                onPress={takePicture} disabled={isProcessing}
-              >
-                {isProcessing ? <ActivityIndicator color="#fff" /> : <View style={styles.captureInner} />}
-              </TouchableOpacity>
-              <View style={{ width: 48 }} />
+      {stage === "home" && (
+        <Animated.View entering={FadeInUp.duration(600).springify()} style={styles.homeRoot}>
+          <View style={styles.homeHeader}>
+            <TouchableOpacity onPress={goToAbout} style={styles.headerIconBtn} activeOpacity={0.7}>
+              <Info size={20} stroke={colors.textTertiary} />
+            </TouchableOpacity>
+            <Text style={styles.homeTitle}>FasalGuard</Text>
+            <TouchableOpacity onPress={goToHistory} style={styles.headerIconBtn} activeOpacity={0.7}>
+              <Clock size={20} stroke={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.heroArea}>
+            <View style={styles.heroIconWrap}>
+              <Leaf size={52} stroke={colors.primary} strokeWidth={1.5} />
             </View>
-          </Animated.View>
+            <Text style={styles.heroHeading}>Leaf Disease Scanner</Text>
+            <Text style={styles.heroSub}>Take or upload a photo to detect disease</Text>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.cameraBtn} onPress={openCamera} activeOpacity={0.85}>
+              <View style={styles.actionIconWrap}>
+                <Camera size={28} stroke="#fff" strokeWidth={2} />
+              </View>
+              <Text style={styles.actionBtnLabel}>Take Photo</Text>
+              <Text style={styles.actionBtnHint}>Use Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.galleryBtn} onPress={pickFromGallery} activeOpacity={0.85}>
+              <View style={[styles.actionIconWrap, { backgroundColor: colors.primaryBg }]}>
+                <ImagePlus size={28} stroke={colors.primary} strokeWidth={2} />
+              </View>
+              <Text style={[styles.actionBtnLabel, { color: colors.text }]}>Upload Image</Text>
+              <Text style={styles.actionBtnHint}>From Gallery</Text>
+            </TouchableOpacity>
+          </View>
+
+          {error && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+          {isProcessing && (
+            <View style={styles.homeLoading}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.webLoadingText}>Analyzing leaf...</Text>
+            </View>
+          )}
+        </Animated.View>
+      )}
+
+      {stage === "camera" && (
+        <View style={styles.cameraWrapper}>
+          <CameraView ref={cameraRef} style={styles.cameraView} facing="back" onCameraReady={() => setCameraReady(true)} onMountError={() => setError("Camera failed to start. Please try again.")}>
+            <View style={styles.cameraOverlay}>
+              <TouchableOpacity onPress={handleBackToHome} style={styles.cameraBackBtn} activeOpacity={0.7}>
+                <Text style={styles.cameraBackText}>Back</Text>
+              </TouchableOpacity>
+              <View style={styles.frame} />
+              {error && <Text style={styles.error}>{error}</Text>}
+              {!cameraReady && !error && (
+                <View style={styles.cameraLoadingWrap}>
+                  <ActivityIndicator size="large" color="#fff" />
+                  <Text style={styles.cameraLoadingText}>Starting camera...</Text>
+                </View>
+              )}
+              <View style={styles.controls}>
+                <TouchableOpacity onPress={pickFromGallery} style={styles.iconButton} activeOpacity={0.7}>
+                  <ImagePlus size={24} stroke="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.captureButton, (!cameraReady || isProcessing) && { opacity: 0.4 }]}
+                  onPress={takePicture} disabled={!cameraReady || isProcessing}
+                >
+                  {isProcessing ? <ActivityIndicator color="#fff" /> : <View style={styles.captureInner} />}
+                </TouchableOpacity>
+                <View style={{ width: 48 }} />
+              </View>
+            </View>
+          </CameraView>
         </View>
       )}
 
@@ -324,13 +422,32 @@ export function CameraScreen() {
           )}
         </Animated.View>
       )}
+
+      <Modal visible={showPermDialog} transparent animationType="fade" onRequestClose={handlePermDeny}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconWrap}>
+              <Camera size={32} stroke={colors.primary} />
+            </View>
+            <Text style={styles.modalTitle}>Camera Access Required</Text>
+            <Text style={styles.modalText}>
+              FasalGuard needs camera access to scan your plant leaves and detect diseases. Your photos are processed securely and not stored.
+            </Text>
+            <TouchableOpacity style={styles.modalAllowBtn} onPress={handlePermAllow} activeOpacity={0.85}>
+              <Text style={styles.modalAllowText}>Allow Camera Access</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalDenyBtn} onPress={handlePermDeny} activeOpacity={0.7}>
+              <Text style={styles.modalDenyText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  camera: { flex: 1 },
+  container: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1, backgroundColor: colors.bg },
   scrollContent: { paddingVertical: 40, paddingHorizontal: 24, gap: 28 },
   decorRing: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: colors.primaryLight, cursor: "pointer", transition: "all 0.2s ease" },
@@ -354,8 +471,31 @@ const styles = StyleSheet.create({
   webLoadingText: { color: colors.primary, fontSize: 16, fontWeight: "500" },
   primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary, paddingVertical: 16, borderRadius: borderRadius.lg, ...shadows.glow(colors.primary) },
   buttonText: { color: "#fff", fontSize: 17, fontWeight: "600" },
-  overlay: { flex: 1, justifyContent: "flex-end", alignItems: "center", paddingBottom: 50, gap: 20 },
-  hint: { color: "#fff", fontSize: 14, fontWeight: "500", textShadow: "0 0 4px rgba(0,0,0,0.5)" },
+  aboutButton: { position: "absolute", top: 50, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", zIndex: 10, ...shadows.sm },
+
+  homeRoot: { flex: 1, paddingTop: Platform.OS === "ios" ? 56 : 16, paddingHorizontal: 24 },
+  homeHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 32 },
+  headerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", ...shadows.sm },
+  homeTitle: { fontSize: 20, fontWeight: "800", color: colors.primaryDeep, letterSpacing: -0.3 },
+  heroArea: { alignItems: "center", gap: 10, marginBottom: 40, paddingTop: 20 },
+  heroIconWrap: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center", borderWidth: 3, borderColor: colors.primaryLight, marginBottom: 8 },
+  heroHeading: { fontSize: 24, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
+  heroSub: { fontSize: 14, color: colors.textSecondary, fontWeight: "500" },
+  actionRow: { flexDirection: "row", gap: 14, marginBottom: 24 },
+  cameraBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: borderRadius.lg, padding: 20, alignItems: "center", gap: 8, ...shadows.glow(colors.primary) },
+  galleryBtn: { flex: 1, backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: 20, alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: colors.primaryLight, ...shadows.sm },
+  actionIconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
+  actionBtnLabel: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  actionBtnHint: { fontSize: 11, color: colors.textTertiary, fontWeight: "500" },
+  homeLoading: { alignItems: "center", gap: 12, paddingVertical: 20 },
+
+  cameraWrapper: { flex: 1, backgroundColor: "#000" },
+  cameraView: { flex: 1 },
+  cameraOverlay: { flex: 1, justifyContent: "flex-end", alignItems: "center", paddingBottom: 50, gap: 20 },
+  cameraBackBtn: { position: "absolute", top: 50, left: 20, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20 },
+  cameraBackText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  cameraLoadingWrap: { position: "absolute", top: "40%", alignItems: "center", gap: 12 },
+  cameraLoadingText: { color: "#fff", fontSize: 15, fontWeight: "500" },
   frame: { width: 280, height: 280, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.6)", position: "absolute", top: "28%", alignSelf: "center" },
   controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 48 },
   captureButton: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: "#fff", justifyContent: "center", alignItems: "center" },
@@ -370,4 +510,13 @@ const styles = StyleSheet.create({
   errorText: { color: colors.errorText, fontSize: 14, textAlign: "center" },
   retryButton: { backgroundColor: colors.error, paddingHorizontal: 20, paddingVertical: 8, borderRadius: borderRadius.sm },
   retryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "center", padding: 32 },
+  modalContent: { width: "100%", maxWidth: 340, backgroundColor: colors.surface, borderRadius: borderRadius.xl, padding: 28, alignItems: "center", gap: 14, ...shadows.lg },
+  modalIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center", marginBottom: 4 },
+  modalTitle: { fontSize: 19, fontWeight: "700", color: colors.text, textAlign: "center" },
+  modalText: { fontSize: 14, color: colors.textSecondary, textAlign: "center", lineHeight: 20 },
+  modalAllowBtn: { width: "100%", backgroundColor: colors.primary, paddingVertical: 14, borderRadius: borderRadius.md, alignItems: "center", marginTop: 8 },
+  modalAllowText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  modalDenyBtn: { paddingVertical: 10, alignItems: "center" },
+  modalDenyText: { color: colors.textTertiary, fontSize: 14, fontWeight: "500" },
 });
