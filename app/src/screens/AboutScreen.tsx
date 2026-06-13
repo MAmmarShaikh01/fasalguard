@@ -1,15 +1,17 @@
 import { View, StyleSheet, Text, TouchableOpacity, ScrollView, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft, Leaf, GraduationCap, Target, Code } from "lucide-react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
 import { colors, shadows, borderRadius, typography } from "../theme";
 
 export function AboutScreen() {
+  const insets = useSafeAreaInsets();
   const setScreen = useDiagnosticStore((s) => s.setScreen);
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => setScreen("camera")} style={styles.backButton} activeOpacity={0.7}>
           <ArrowLeft size={22} stroke={colors.text} />
         </TouchableOpacity>
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 56 : 16,
+    paddingTop: Platform.OS === "ios" ? 56 : 16, // overridden inline with insets
     paddingBottom: 12,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,

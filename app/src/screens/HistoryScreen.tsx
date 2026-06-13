@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { Leaf, ArrowRight, FlaskConical, Sparkles, Trash2, ScanLine } from "lucide-react-native";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
@@ -15,13 +16,14 @@ function getSeverityColor(pct: number): string {
 }
 
 export function HistoryScreen() {
+  const insets = useSafeAreaInsets();
   const history = useDiagnosticStore((s) => s.history);
   const restoreResult = useDiagnosticStore((s) => s.restoreResult);
   const clearHistory = useDiagnosticStore((s) => s.clearHistory);
 
   return (
     <View style={styles.container}>
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+      <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerIconWrap}>
             <ScanLine size={22} stroke="#fff" />
@@ -119,7 +121,7 @@ export function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingTop: 50, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", gap: 16 },
+  header: { paddingHorizontal: 16, paddingBottom: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", gap: 16 },
   headerTop: { flexDirection: "row", alignItems: "center", gap: 14 },
   headerIconWrap: { width: 44, height: 44, borderRadius: borderRadius.md, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center", ...shadows.glow(colors.primary) },
   clearButton: { padding: 8, backgroundColor: colors.errorBg, borderRadius: borderRadius.sm },

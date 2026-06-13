@@ -42,3 +42,5 @@ plantdoc_complete/
 
 app-icon.jpg
 new-icon.png
+# PPTX
+*.pptx

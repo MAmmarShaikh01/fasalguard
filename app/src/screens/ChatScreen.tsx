@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Keyboard } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp, FadeIn, FadeInDown } from "react-native-reanimated";
 import { MessageCircle, SendHorizonal, Eraser, Bot, User, Sparkles } from "lucide-react-native";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
@@ -10,6 +11,7 @@ import type { ChatMessage } from "../types";
 const SUGGESTIONS: string[] = [];
 
 export function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const chatHistory = useDiagnosticStore((s) => s.chatHistory);
   const currentResult = useDiagnosticStore((s) => s.currentResult);
   const addChatMessage = useDiagnosticStore((s) => s.addChatMessage);
@@ -30,6 +32,7 @@ export function ChatScreen() {
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || isChatLoading) return;
+    Keyboard.dismiss();
     setInput("");
     const userMsg: ChatMessage = { role: "user", text, timestamp: Date.now() };
     addChatMessage(userMsg);
@@ -66,8 +69,8 @@ export function ChatScreen() {
   }, []);
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={100}>
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}>
+      <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerIconWrap}>
           <Bot size={20} stroke="#fff" />
         </View>
@@ -114,7 +117,7 @@ export function ChatScreen() {
         </View>
       )}
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 8) + 8 }]}>
         <TextInput
           style={styles.input}
           value={input}
@@ -141,7 +144,7 @@ export function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 56, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
   headerIconWrap: { width: 36, height: 36, borderRadius: borderRadius.sm, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
   title: { fontSize: 18, fontWeight: "700", color: colors.primaryDeep, flex: 1 },
   clearButton: { padding: 6, backgroundColor: colors.bg, borderRadius: borderRadius.sm },
@@ -162,7 +165,7 @@ const styles = StyleSheet.create({
   typing: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 4, paddingLeft: 24 },
   typingBubble: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16, borderWidth: 1, borderColor: "#f1f5f9", alignSelf: "flex-start" },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, opacity: 0.6 },
-  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 12, paddingBottom: Platform.OS === "ios" ? 28 : 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: "#f1f5f9" },
+  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 12, paddingTop: 12, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: "#f1f5f9" },
   input: { flex: 1, backgroundColor: colors.bg, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100, color: colors.text },
   sendButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center", ...shadows.glow(colors.primary) },
   sendButtonDisabled: { opacity: 0.5, boxShadow: "none", elevation: 0 },

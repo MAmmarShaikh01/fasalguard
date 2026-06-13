@@ -1,6 +1,7 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, TouchableOpacity, Text, Platform } from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Scan, MessageCircle, Clock } from "lucide-react-native";
 import { CameraScreen } from "./src/screens/CameraScreen";
 import { ResultScreen } from "./src/screens/ResultScreen";
@@ -18,13 +19,14 @@ const tabs: { key: Screen; label: string; icon: typeof Scan }[] = [
   { key: "chat", label: "Chat", icon: MessageCircle },
 ];
 
-export default function App() {
+function AppContent() {
+  const insets = useSafeAreaInsets();
   const screen = useDiagnosticStore((s) => s.currentScreen);
   const setScreen = useDiagnosticStore((s) => s.setScreen);
   const showTabs = screen !== "result" && screen !== "loading" && screen !== "about";
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <>
       <StatusBar style="dark" />
       <View style={styles.content}>
         {screen === "loading" && <LoadingScreen />}
@@ -35,7 +37,7 @@ export default function App() {
         {screen === "about" && <AboutScreen />}
       </View>
       {showTabs && (
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { paddingTop: Math.max(insets.bottom, 4) + 4, paddingBottom: insets.bottom + (Platform.OS === "ios" ? 28 : 16) }]}>
           <View style={styles.tabBarInner}>
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -59,6 +61,16 @@ export default function App() {
           </View>
         </View>
       )}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <AppContent />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
@@ -68,8 +80,6 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   tabBar: {
     paddingHorizontal: 16,
-    paddingBottom: Platform.OS === "ios" ? 28 : 16,
-    paddingTop: 8,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",

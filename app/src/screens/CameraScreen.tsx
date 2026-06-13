@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Platform, ScrollView, Modal, Linking } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Animated, { FadeIn, FadeInUp, FadeInDown, useAnimatedStyle, withSpring, useSharedValue } from "react-native-reanimated";
@@ -29,6 +30,7 @@ function validatePredictions(
 }
 
 export function CameraScreen() {
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<any>(null);
   const setCapturedImage = useDiagnosticStore((s) => s.setCapturedImage);
   const setResult = useDiagnosticStore((s) => s.setResult);
@@ -219,7 +221,7 @@ export function CameraScreen() {
   if (isWeb) {
     return (
       <View style={styles.container}>
-        <TouchableOpacity onPress={goToAbout} style={styles.aboutButton} activeOpacity={0.7}>
+        <TouchableOpacity onPress={goToAbout} style={[styles.aboutButton, { top: insets.top + 10 }]} activeOpacity={0.7}>
           <Info size={18} stroke={colors.textTertiary} />
         </TouchableOpacity>
         {stage === "home" && (
@@ -320,7 +322,7 @@ export function CameraScreen() {
   return (
     <View style={styles.container}>
       {stage === "home" && (
-        <Animated.View entering={FadeInUp.duration(600).springify()} style={styles.homeRoot}>
+        <Animated.View entering={FadeInUp.duration(600).springify()} style={[styles.homeRoot, { paddingTop: insets.top + 16 }]}>
           <View style={styles.homeHeader}>
             <TouchableOpacity onPress={goToAbout} style={styles.headerIconBtn} activeOpacity={0.7}>
               <Info size={20} stroke={colors.textTertiary} />
@@ -473,7 +475,7 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   aboutButton: { position: "absolute", top: 50, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", zIndex: 10, ...shadows.sm },
 
-  homeRoot: { flex: 1, paddingTop: Platform.OS === "ios" ? 56 : 16, paddingHorizontal: 24 },
+  homeRoot: { flex: 1, paddingHorizontal: 24 },
   homeHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 32 },
   headerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", ...shadows.sm },
   homeTitle: { fontSize: 20, fontWeight: "800", color: colors.primaryDeep, letterSpacing: -0.3 },
