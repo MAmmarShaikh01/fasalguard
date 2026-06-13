@@ -1,13 +1,14 @@
 import { useState, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Platform } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Platform, ScrollView } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import Animated, { FadeIn, FadeInUp, FadeInDown } from "react-native-reanimated";
-import { ImagePlus, Leaf, Upload } from "lucide-react-native";
+import Animated, { FadeIn, FadeInUp, FadeInDown, useAnimatedStyle, withSpring, useSharedValue } from "react-native-reanimated";
+import { ImagePlus, Leaf, Upload, ScanLine } from "lucide-react-native";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
 import { predictLeaf, predictLeafFromFile, checkQualityFromFile } from "../services/api";
 import { compressImage } from "../utils/compress";
 import { checkImageQuality } from "../utils/imageQuality";
 import { QualityBadge } from "../components/QualityBadge";
+import { colors, shadows, borderRadius, typography } from "../theme";
 import type { DiagnosticResult } from "../types";
 
 const isWeb = Platform.OS === "web";
@@ -44,6 +45,14 @@ export function CameraScreen() {
   const addToHistory = useDiagnosticStore((s) => s.addToHistory);
   const isProcessing = useDiagnosticStore((s) => s.isProcessing);
   const error = useDiagnosticStore((s) => s.error);
+
+  const leafScale = useSharedValue(1);
+  const leafRotate = useSharedValue(0);
+  const [isLeafHovered, setIsLeafHovered] = useState(false);
+
+  const leafAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: leafScale.value }, { rotate: `${leafRotate.value}deg` }],
+  }));
 
   const [stage, setStage] = useState<Stage>("viewfinder");
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -177,24 +186,75 @@ export function CameraScreen() {
     return (
       <View style={styles.container}>
         {stage === "viewfinder" && (
-          <Animated.View entering={FadeInUp.duration(600).springify()} style={styles.webPicker}>
-            <View style={styles.webIconWrap}>
-              <Leaf size={48} stroke="#fff" strokeWidth={1.5} />
-            </View>
-            <Text style={styles.webTitle}>Plant Scanner</Text>
-            <Text style={styles.webSubtitle}>Take or upload a photo of a leaf to identify the plant and detect any diseases. The AI model will analyze the leaf and provide treatment recommendations.</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={pickFromWeb} activeOpacity={0.85}>
-              <Upload size={20} stroke="#fff" />
-              <Text style={styles.buttonText}>Choose Image</Text>
-            </TouchableOpacity>
-            {error && <Text style={styles.error}>{error}</Text>}
-            {isProcessing && (
-              <View style={styles.webLoading}>
-                <ActivityIndicator size="large" color="#22c55e" />
-                <Text style={styles.webLoadingText}>Analyzing leaf...</Text>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true} bounces={false}>
+            <Animated.View entering={FadeInUp.duration(600).springify()}>
+              <View style={styles.heroSection}>
+                <Animated.View
+                  style={[styles.decorRing, isLeafHovered && styles.decorRingHovered, leafAnimatedStyle]}
+                  onMouseEnter={() => { setIsLeafHovered(true); leafScale.value = withSpring(1.08, { damping: 8, stiffness: 100 }); leafRotate.value = withSpring(-5, { damping: 6, stiffness: 80 }); }}
+                  onMouseLeave={() => { setIsLeafHovered(false); leafScale.value = withSpring(1, { damping: 10, stiffness: 120 }); leafRotate.value = withSpring(0, { damping: 8, stiffness: 100 }); }}
+                >
+                  <View style={[styles.decorRingInner, isLeafHovered && styles.decorRingInnerHovered]}>
+                    <View style={[styles.webIconWrap, isLeafHovered && styles.webIconWrapHovered]}>
+                      <Leaf size={44} stroke={isLeafHovered ? "#fff" : colors.primary} strokeWidth={1.5} />
+                    </View>
+                  </View>
+                </Animated.View>
+                <Text style={styles.webTitle}>FasalGuard</Text>
+                <Text style={styles.webTagline}>AI-Powered Plant Disease Detector</Text>
               </View>
-            )}
-          </Animated.View>
+
+              <View style={styles.webInfoCards}>
+                <View style={styles.infoCard}>
+                  <View style={styles.infoIconWrap}>
+                    <ScanLine size={18} stroke={colors.primary} />
+                  </View>
+                  <View style={styles.infoTextWrap}>
+                    <Text style={styles.infoTitle}>Instant Diagnosis</Text>
+                    <Text style={styles.infoText}>Snap a leaf photo and get AI-powered disease identification in seconds</Text>
+                  </View>
+                </View>
+                <View style={styles.infoCard}>
+                  <View style={[styles.infoIconWrap, { backgroundColor: colors.warningBg }]}>
+                    <Leaf size={18} stroke={colors.warning} />
+                  </View>
+                  <View style={styles.infoTextWrap}>
+                    <Text style={styles.infoTitle}>Treatment Advice</Text>
+                    <Text style={styles.infoText}>Receive tailored treatment recommendations and plant care guides</Text>
+                  </View>
+                </View>
+                <View style={styles.infoCard}>
+                  <View style={[styles.infoIconWrap, { backgroundColor: "#f0f0ff" }]}>
+                    <Upload size={18} stroke="#6366f1" />
+                  </View>
+                  <View style={styles.infoTextWrap}>
+                    <Text style={styles.infoTitle}>Scan History</Text>
+                    <Text style={styles.infoText}>Track your plant's health over time with saved diagnosis history</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.ctaSection}>
+                <TouchableOpacity style={styles.primaryButton} onPress={pickFromWeb} activeOpacity={0.85}>
+                  <Upload size={20} stroke="#fff" />
+                  <Text style={styles.buttonText}>Upload a Leaf Photo</Text>
+                </TouchableOpacity>
+                <Text style={styles.ctaHint}>Supports JPG, PNG, WEBP</Text>
+              </View>
+
+              {error && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+              {isProcessing && (
+                <View style={styles.webLoading}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={styles.webLoadingText}>Analyzing leaf...</Text>
+                </View>
+              )}
+            </Animated.View>
+          </ScrollView>
         )}
         {stage === "review" && previewUri && (
           <Animated.View entering={FadeIn.duration(400)} style={styles.reviewContainer}>
@@ -202,7 +262,7 @@ export function CameraScreen() {
             <QualityBadge blurry={quality.isBlurry} dark={quality.isTooDark} likelyLeaf={quality.likelyLeaf} onRetake={handleRetake} onProceed={handleProceedAnyway} />
             {isProcessing && (
               <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#22c55e" />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Analyzing leaf...</Text>
               </View>
             )}
@@ -250,7 +310,7 @@ export function CameraScreen() {
           <QualityBadge blurry={quality.isBlurry} dark={quality.isTooDark} likelyLeaf={quality.likelyLeaf} onRetake={handleRetake} onProceed={handleProceedAnyway} />
           {isProcessing && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#22c55e" />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Analyzing leaf...</Text>
             </View>
           )}
@@ -271,16 +331,31 @@ export function CameraScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   camera: { flex: 1 },
-  webPicker: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f0fdf4", gap: 16, padding: 32 },
-  webIconWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: "#22c55e", justifyContent: "center", alignItems: "center", marginBottom: 8,     boxShadow: "0 0 20px rgba(34,197,94,0.35)", elevation: 10 },
-  webTitle: { fontSize: 28, fontWeight: "800", color: "#15803d" },
-  webSubtitle: { fontSize: 15, color: "#6b7280", textAlign: "center", marginBottom: 8 },
-  webLoading: { alignItems: "center", gap: 12 },
-  webLoadingText: { color: "#22c55e", fontSize: 16, fontWeight: "500" },
-  primaryButton: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22c55e", paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14,     boxShadow: "0 0 12px rgba(34,197,94,0.3)", elevation: 6 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  scroll: { flex: 1, backgroundColor: colors.bg },
+  scrollContent: { paddingVertical: 40, paddingHorizontal: 24, gap: 28 },
+  decorRing: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: colors.primaryLight, cursor: "pointer", transition: "all 0.2s ease" },
+  decorRingHovered: { backgroundColor: colors.primary, borderColor: colors.primaryDeep },
+  decorRingInner: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: colors.primaryLight, ...shadows.glow(colors.primary), cursor: "pointer", transition: "all 0.2s ease" },
+  decorRingInnerHovered: { backgroundColor: colors.primaryDeep, borderColor: colors.primaryDeep },
+  heroSection: { alignItems: "center", gap: 10, paddingTop: 20, marginBottom: 16 },
+  webIconWrap: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center", cursor: "pointer", transition: "all 0.2s ease" },
+  webIconWrapHovered: { backgroundColor: colors.primary },
+  webTitle: { fontSize: 32, fontWeight: "800", color: colors.primaryDeep, letterSpacing: -0.5 },
+  webTagline: { fontSize: 15, color: colors.textSecondary, fontWeight: "500" },
+  webInfoCards: { gap: 12, marginBottom: 12 },
+  infoIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primaryBg, justifyContent: "center", alignItems: "center" },
+  infoTextWrap: { flex: 1, gap: 2 },
+  infoTitle: { fontSize: 15, fontWeight: "600", color: colors.text },
+  infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: colors.surface, padding: 16, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.cardBorder, ...shadows.sm },
+  infoText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  ctaSection: { gap: 10, paddingTop: 24 },
+  ctaHint: { fontSize: 12, color: colors.textTertiary, textAlign: "center", fontWeight: "500" },
+  webLoading: { alignItems: "center", gap: 12, paddingTop: 8 },
+  webLoadingText: { color: colors.primary, fontSize: 16, fontWeight: "500" },
+  primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary, paddingVertical: 16, borderRadius: borderRadius.lg, ...shadows.glow(colors.primary) },
+  buttonText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   overlay: { flex: 1, justifyContent: "flex-end", alignItems: "center", paddingBottom: 50, gap: 20 },
-  hint: { color: "#fff", fontSize: 14, fontWeight: "500",     textShadow: "0 0 4px rgba(0,0,0,0.5)" },
+  hint: { color: "#fff", fontSize: 14, fontWeight: "500", textShadow: "0 0 4px rgba(0,0,0,0.5)" },
   frame: { width: 280, height: 280, borderRadius: 16, borderWidth: 2, borderColor: "rgba(255,255,255,0.6)", position: "absolute", top: "28%", alignSelf: "center" },
   controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 48 },
   captureButton: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: "#fff", justifyContent: "center", alignItems: "center" },
@@ -291,8 +366,8 @@ const styles = StyleSheet.create({
   reviewImage: { width: "100%", height: "60%" },
   loadingOverlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", gap: 12 },
   loadingText: { color: "#fff", fontSize: 16, fontWeight: "500" },
-  errorBox: { backgroundColor: "#fef2f2", padding: 16, borderRadius: 12, alignItems: "center", gap: 10, marginHorizontal: 32 },
-  errorText: { color: "#991b1b", fontSize: 14, textAlign: "center" },
-  retryButton: { backgroundColor: "#ef4444", paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8 },
+  errorBox: { backgroundColor: colors.errorBg, padding: 16, borderRadius: borderRadius.md, alignItems: "center", gap: 10, marginHorizontal: 32 },
+  errorText: { color: colors.errorText, fontSize: 14, textAlign: "center" },
+  retryButton: { backgroundColor: colors.error, paddingHorizontal: 20, paddingVertical: 8, borderRadius: borderRadius.sm },
   retryText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 });

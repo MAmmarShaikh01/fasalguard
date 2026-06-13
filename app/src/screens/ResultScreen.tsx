@@ -3,6 +3,7 @@ import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { ArrowLeft, RefreshCw, Share2, Leaf } from "lucide-react-native";
 import { useDiagnosticStore } from "../store/useDiagnosticStore";
 import { ReportCard } from "../components/ReportCard";
+import { colors, shadows, borderRadius } from "../theme";
 
 export function ResultScreen() {
   const result = useDiagnosticStore((s) => s.currentResult);
@@ -23,14 +24,14 @@ export function ResultScreen() {
     <View style={styles.container}>
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
         <TouchableOpacity onPress={() => { reset(); setScreen("camera"); }} style={styles.headerBtn}>
-          <ArrowLeft size={22} stroke="#15803d" />
+          <ArrowLeft size={22} stroke={colors.primaryDeep} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Leaf size={18} stroke="#22c55e" />
+          <Leaf size={18} stroke={colors.primary} />
           <Text style={styles.title}>Diagnosis</Text>
         </View>
         <TouchableOpacity onPress={handleShare} style={styles.headerBtn}>
-          <Share2 size={20} stroke="#15803d" />
+          <Share2 size={20} stroke={colors.primaryDeep} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -38,7 +39,7 @@ export function ResultScreen() {
         <ReportCard result={result} imageUri={imageUri ?? undefined} />
       </ScrollView>
 
-      <Animated.View entering={FadeInUp.duration(500)}>
+      <Animated.View entering={FadeInUp.duration(500)} style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.newScanButton}
           onPress={() => { reset(); setScreen("camera"); }}
@@ -53,12 +54,13 @@ export function ResultScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f0fdf4" },
+  container: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 60, paddingBottom: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#f0fdf4", justifyContent: "center", alignItems: "center" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 60, paddingBottom: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" },
   headerCenter: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontSize: 18, fontWeight: "700", color: "#15803d" },
-  newScanButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22c55e", margin: 16, paddingVertical: 16, borderRadius: 16, marginBottom: 40,     boxShadow: "0 0 12px rgba(34,197,94,0.3)", elevation: 6 },
+  title: { fontSize: 18, fontWeight: "700", color: colors.primaryDeep },
+  bottomBar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: "#f1f5f9" },
+  newScanButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary, margin: 16, paddingVertical: 16, borderRadius: borderRadius.lg, ...shadows.glow(colors.primary) },
   scanButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

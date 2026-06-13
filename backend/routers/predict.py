@@ -4,6 +4,7 @@ from models.vit_finetuned import ViTFineTuned
 from models.severity_analyzer import SeverityAnalyzer
 from utils.image_utils import preprocess_image
 from utils.quality_check import analyze_image_quality
+from models.plant_detector import get_detector
 from knowledge_base.plant_diseases import KNOWLEDGE_BASE
 from knowledge_base.plant_care import get_plant_name, get_watering_info
 import logging
@@ -58,6 +59,19 @@ async def predict_leaf(file: UploadFile = File(...)):
 
     quality = analyze_image_quality(image)
 
+    # ── YOLO Leaf Detection ──────────────────────────────────────
+    try:
+        detector = get_detector()
+        cropped_image, bbox = detector.detect_and_crop(image)
+        if cropped_image is not None:
+            image = cropped_image
+        else:
+            bbox = None
+    except Exception as e:
+        logger.warning(f"YOLO detection failed ({e}), skipping leaf crop")
+        bbox = None
+    # ─────────────────────────────────────────────────────────────
+
     try:
         top_k = classifier.predict_top_k(image)
         disease_name = top_k[0]["label"]
@@ -108,6 +122,8 @@ async def predict_leaf(file: UploadFile = File(...)):
             for r in top_k
         ],
     }
+    if bbox:
+        response["bbox"] = bbox
     if warnings:
         response["warnings"] = warnings
     return response

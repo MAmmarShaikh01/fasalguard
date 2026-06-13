@@ -10,3 +10,4 @@ scipy
 groq
 huggingface-hub
 ai-edge-litert
+ultralytics>=8.0.0

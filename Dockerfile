@@ -9,7 +9,8 @@ WORKDIR /app
 COPY --chown=user backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-    && pip install scipy
+    && pip install scipy \
+    && pip install opencv-python-headless
 
 COPY --chown=user backend/ .
 COPY --chown=user fasalguard_final_93pct/ fasalguard_final_93pct/

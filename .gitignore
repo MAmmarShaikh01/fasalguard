@@ -36,3 +36,6 @@ app/LICENSE
 app/.claude/
 app/AGENTS.md
 app/CLAUDE.md
+
+# PlantDoc training outputs (best.pt is copied to backend/models/)
+plantdoc_complete/
